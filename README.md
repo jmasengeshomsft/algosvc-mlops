@@ -1,6 +1,14 @@
 # AlgoSvc - MLOps Container Service
 
+[![GitHub Repository](https://img.shields.io/badge/GitHub-algosvc--mlops-blue?logo=github)](https://github.com/jmasengeshomsft/algosvc-mlops)
+[![Docker](https://img.shields.io/badge/Docker-Multi--stage%20Build-2496ED?logo=docker)](./docker/Dockerfile.cpu)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?logo=kubernetes)](./k8s/deployment.yaml)
+
 A containerized machine learning service that combines a native C++ computational kernel with a Java HTTP service for high-performance inference.
+
+## Repository
+
+🔗 **GitHub**: https://github.com/jmasengeshomsft/algosvc-mlops
 
 ## Architecture
 
@@ -182,6 +190,47 @@ algosvc/
 └── .env                        # Environment variables
 ```
 
+## Development Workflow
+
+### Clone Repository
+```bash
+git clone https://github.com/jmasengeshomsft/algosvc-mlops.git
+cd algosvc-mlops
+```
+
+### Local Development
+```bash
+# Copy to WSL for building (if needed)
+cp -r . ~/work/algosvc-mlops && cd ~/work/algosvc-mlops
+
+# Build and run with Docker Compose
+chmod +x scripts/*.sh
+./scripts/compose.sh up
+
+# Test endpoints
+./scripts/compose.sh test
+```
+
+### Kubernetes Development
+```bash
+# Switch to Docker Desktop Kubernetes
+kubectl config use-context docker-desktop
+
+# Deploy to local Kubernetes
+kubectl apply -f k8s/deployment.yaml
+
+# Port-forward for testing
+kubectl port-forward svc/algosvc 8081:80
+```
+
+### Contributing
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Make changes and test locally
+4. Commit with clear messages: `git commit -m "Add: feature description"`
+5. Push to your fork: `git push origin feature/your-feature`
+6. Create a Pull Request
+
 ## Next Steps
 
 Once local testing is working, you can proceed with:
@@ -191,6 +240,7 @@ Once local testing is working, you can proceed with:
 3. **Azure Container Apps** - Deploy with internal ingress
 4. **Monitoring** - Add Prometheus, Application Insights
 5. **Security** - Key Vault integration, Workload Identity
+6. **CI/CD** - GitHub Actions workflows
 
 ## Troubleshooting
 

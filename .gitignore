@@ -1,0 +1,46 @@
+# Build artifacts
+native/build/
+java/target/
+*.jar
+*.so
+*.dll
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/*.log
+*.log
+
+# Environment variables (if containing sensitive data)
+# .env
+
+# Docker
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Java specific
+*.class
+*.jar
+hs_err_pid*
+
+# Maven
+dependency-reduced-pom.xml
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile

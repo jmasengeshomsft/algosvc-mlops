@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: algosvc }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: algosvc } }
+  template:
+    metadata:
+      labels: { app: algosvc }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      securityContext: { runAsNonRoot: true, fsGroup: 10001 }
+      containers:
+        - name: app
+          image: algosvc:v0.1.0
+          imagePullPolicy: Never
+          ports: [{ containerPort: 8080 }]
+          env:
+            - { name: PORT, value: "8080" }
+            - { name: LD_LIBRARY_PATH, value: /app/lib }
+            - { name: JAVA_TOOL_OPTIONS, value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75" }
+            - name: OMP_NUM_THREADS
+              valueFrom: { resourceFieldRef: { resource: limits.cpu } }
+          resources:
+            requests: { cpu: "1", memory: "2Gi" }
+            limits:   { cpu: "2", memory: "4Gi" }
+          readinessProbe: { httpGet: { path: /health/ready, port: 8080 }, periodSeconds: 5 }
+          livenessProbe:  { httpGet: { path: /health/live,  port: 8080 }, periodSeconds: 10 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: algosvc
+  annotations:
+    # uncomment the next line to create an **internal** Azure LB
+    # service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+spec:
+  type: LoadBalancer
+  selector: { app: algosvc }
+  ports:
+    - port: 80
+      targetPort: 8080

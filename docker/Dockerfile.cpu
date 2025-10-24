@@ -1,0 +1,35 @@
+# --- native build ---
+FROM ubuntu:22.04 AS native-build
+RUN apt-get update && apt-get install -y build-essential cmake openjdk-21-jdk
+# Set JAVA_HOME for the correct architecture
+RUN export ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+        echo "export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64" >> /etc/environment; \
+    elif [ "$ARCH" = "arm64" ]; then \
+        echo "export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64" >> /etc/environment; \
+    fi
+WORKDIR /src
+COPY native/ /src/
+RUN . /etc/environment && \
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build --target kernels
+
+# --- jar build ---
+FROM maven:3.9-eclipse-temurin-21 AS jar-build
+WORKDIR /build
+COPY java/pom.xml .
+RUN mvn -q -DskipTests dependency:go-offline
+COPY java/src /build/src
+RUN mvn -q -DskipTests package
+
+# --- runtime ---
+FROM eclipse-temurin:21-jre
+RUN useradd -u 10001 app
+WORKDIR /app
+COPY --from=jar-build /build/target/algosvc-0.1.0.jar /app/app.jar
+COPY --from=native-build /src/build/libkernels.so /app/lib/
+ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75"
+ENV LD_LIBRARY_PATH=/app/lib
+USER 10001
+EXPOSE 8080
+ENTRYPOINT ["java","-jar","/app/app.jar"]

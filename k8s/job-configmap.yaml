@@ -1,7 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: algosvc-input-data
+data:
+  sample.json: |
+    {
+      "x": [-2, -1, 0, 1, 2],
+      "scale": 2.0
+    }
+  test1.json: |
+    {
+      "x": [0.5, 1.0, 1.5, 2.0],
+      "scale": 1.5
+    }
+  test2.json: |
+    {
+      "x": [0, 0.5, 1.0],
+      "scale": 1.0
+    }
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: algosvc-job
+  name: algosvc-job-configmap
 spec:
   completions: 1
   parallelism: 1
@@ -15,6 +36,20 @@ spec:
       securityContext:
         runAsNonRoot: true
         fsGroup: 10001
+      initContainers:
+        - name: copy-input
+          image: busybox
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Copying input files from ConfigMap..."
+              cp /configmap/* /input/
+              ls -la /input/
+          volumeMounts:
+            - name: configmap-data
+              mountPath: /configmap
+            - name: input-data
+              mountPath: /input
       containers:
         - name: app
           image: algosvc:v0.1.0
@@ -30,17 +65,13 @@ spec:
               value: "/app/lib"
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75"
-            - name: OMP_NUM_THREADS
-              valueFrom:
-                resourceFieldRef:
-                  resource: limits.cpu
           resources:
             requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
               cpu: "1"
               memory: "2Gi"
-            limits:
-              cpu: "2"
-              memory: "4Gi"
           volumeMounts:
             - name: input-data
               mountPath: /rundata/input
@@ -48,31 +79,11 @@ spec:
             - name: output-data
               mountPath: /rundata/output
       volumes:
+        - name: configmap-data
+          configMap:
+            name: algosvc-input-data
         - name: input-data
-          persistentVolumeClaim:
-            claimName: algosvc-input-pvc
+          emptyDir: {}
         - name: output-data
-          persistentVolumeClaim:
-            claimName: algosvc-output-pvc
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: algosvc-input-pvc
-spec:
-  accessModes:
-    - ReadOnlyMany
-  resources:
-    requests:
-      storage: 1Gi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: algosvc-output-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
+          emptyDir: {}
+

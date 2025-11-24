@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: algosvc-job
+  name: algosvc-job-test
 spec:
   completions: 1
   parallelism: 1
@@ -30,17 +30,13 @@ spec:
               value: "/app/lib"
             - name: JAVA_TOOL_OPTIONS
               value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75"
-            - name: OMP_NUM_THREADS
-              valueFrom:
-                resourceFieldRef:
-                  resource: limits.cpu
           resources:
             requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
               cpu: "1"
               memory: "2Gi"
-            limits:
-              cpu: "2"
-              memory: "4Gi"
           volumeMounts:
             - name: input-data
               mountPath: /rundata/input
@@ -49,30 +45,11 @@ spec:
               mountPath: /rundata/output
       volumes:
         - name: input-data
-          persistentVolumeClaim:
-            claimName: algosvc-input-pvc
+          hostPath:
+            path: /Users/jmasengesho/Developer/microsoft/misc/algosvc-mlops/rundata/input
+            type: Directory
         - name: output-data
-          persistentVolumeClaim:
-            claimName: algosvc-output-pvc
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: algosvc-input-pvc
-spec:
-  accessModes:
-    - ReadOnlyMany
-  resources:
-    requests:
-      storage: 1Gi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: algosvc-output-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
+          hostPath:
+            path: /Users/jmasengesho/Developer/microsoft/misc/algosvc-mlops/rundata/output
+            type: DirectoryOrCreate
+

@@ -20,6 +20,10 @@ Thumbs.db
 logs/*.log
 *.log
 
+# Batch job data
+rundata/output/*
+!rundata/output/.gitkeep
+
 # Environment variables (if containing sensitive data)
 # .env
 

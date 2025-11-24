@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Multi--stage%20Build-2496ED?logo=docker)](./docker/Dockerfile.cpu)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-326CE5?logo=kubernetes)](./k8s/deployment.yaml)
 
-A containerized machine learning service that combines a native C++ computational kernel with a Java HTTP service for high-performance inference.
+A containerized machine learning batch job that combines a native C++ computational kernel with a Java application for high-performance inference. Processes input files from a directory and writes results to an output directory.
 
 ## Repository
 
@@ -13,9 +13,10 @@ A containerized machine learning service that combines a native C++ computationa
 ## Architecture
 
 - **libkernels.so** — C++ shared library with fast sigmoid operations via JNI
-- **algosvc.jar** — Java Javalin HTTP service that exposes REST endpoints
+- **algosvc.jar** — Java batch application that processes files from input directory
 - **Multi-stage Docker build** — Compiles both components in isolated build stages
-- **Production ready** — Includes health checks, observability hooks, and security best practices
+- **Batch job pattern** — Starts, processes files, and exits (not a long-running service)
+- **Production ready** — Configurable input/output directories via environment variables
 
 ## Prerequisites
 
@@ -54,25 +55,37 @@ cp -r /mnt/c/Users/jmasengesho/Documents/developer/AI/MLOps/Danaher/CustomAlgori
 cd ~/work/algosvc
 ```
 
-### 2. Run with Docker Compose (Recommended)
+### 2. Prepare Input Data
+```bash
+# Create input/output directories
+mkdir -p rundata/input rundata/output
+
+# Create a sample input file
+cat > rundata/input/sample.json <<EOF
+{
+  "x": [-2, -1, 0, 1, 2],
+  "scale": 2.0
+}
+EOF
+```
+
+### 3. Run with Docker Compose
 ```bash
 # Make scripts executable
 chmod +x scripts/*.sh
 
-# Start services in background
-./scripts/compose.sh up
+# Run the batch job
+docker-compose up
 
-# Or start with interactive logs
-./scripts/compose-up.sh
+# The job will process all JSON files in rundata/input
+# and write results to rundata/output
 ```
 
-### 3. Test the Service
+### 4. Check Results
 ```bash
-# Test endpoints
-./scripts/compose.sh test
-
-# Or manually test
-./scripts/test-endpoints.sh
+# View output files
+ls -la rundata/output/
+cat rundata/output/sample.json
 ```
 
 ### Alternative: Direct Docker Build
@@ -81,19 +94,13 @@ chmod +x scripts/*.sh
 ./scripts/build-and-run.sh
 ```
 
-## API Endpoints
+## Usage
 
-### Health Checks
-- `GET /health/ready` - Readiness probe
-- `GET /health/live` - Liveness probe
+### Input/Output Format
 
-### Service Information
-- `GET /version` - Returns service version and configuration
+The job processes JSON files from the input directory. Each file should contain:
 
-### Inference
-- `POST /infer` - Perform sigmoid inference on input data
-
-#### Request Format
+#### Input File Format (`/rundata/input/*.json`)
 ```json
 {
   "x": [-2, -1, 0, 1, 2],
@@ -101,37 +108,45 @@ chmod +x scripts/*.sh
 }
 ```
 
-#### Response Format
+#### Output File Format (`/rundata/output/*.json`)
 ```json
 {
   "y": [0.018, 0.119, 0.5, 0.881, 0.982],
-  "algoVersion": "0.1.0"
+  "algoVersion": "0.1.0",
+  "elapsedNs": 1234567
 }
 ```
 
-## Docker Compose Commands
+### Environment Variables
+
+- `INPUT_DIR` - Input directory path (default: `/rundata/input`)
+- `OUTPUT_DIR` - Output directory path (default: `/rundata/output`)
+- `ALGO_VERSION` - Algorithm version string (default: `0.1.0`)
+
+### Behavior
+
+- Processes all `.json` files in the input directory
+- Creates output files with the same name in the output directory
+- Exits with code 0 on success, 1 on error
+- Logs processing information to stdout/stderr
+
+## Docker Compose Usage
 
 ```bash
-# Start services in background
-./scripts/compose.sh up
+# Run the batch job
+docker-compose up
 
-# Start with Nginx reverse proxy
-./scripts/compose.sh up-nginx
+# Run with custom input/output directories
+INPUT_DIR=/custom/input OUTPUT_DIR=/custom/output docker-compose up
+
+# Rebuild and run
+docker-compose build && docker-compose up
 
 # View logs
-./scripts/compose.sh logs
+docker-compose logs
 
-# Stop services
-./scripts/compose.sh down
-
-# Rebuild images
-./scripts/compose.sh rebuild
-
-# Test endpoints
-./scripts/compose.sh test
-
-# Clean up everything
-./scripts/compose.sh clean
+# Clean up
+docker-compose down
 ```
 
 ## Manual Build (Alternative to Compose)
@@ -158,9 +173,22 @@ cd ~/work/algosvc
 docker build -f docker/Dockerfile.cpu -t algosvc:v0.1.0 .
 ```
 
-### Run Container
+### Run Container as Batch Job
 ```bash
-docker run --rm -p 8080:8080 algosvc:v0.1.0
+# Create input/output directories
+mkdir -p /tmp/algosvc/input /tmp/algosvc/output
+
+# Create sample input
+echo '{"x": [1, 2, 3], "scale": 1.0}' > /tmp/algosvc/input/test.json
+
+# Run the job
+docker run --rm \
+  -v /tmp/algosvc/input:/rundata/input:ro \
+  -v /tmp/algosvc/output:/rundata/output \
+  algosvc:v0.1.0
+
+# Check output
+cat /tmp/algosvc/output/test.json
 ```
 
 ## Project Structure
@@ -173,7 +201,7 @@ algosvc/
 │   ├── pom.xml                 # Maven configuration
 │   └── src/main/java/com/acme/
 │       ├── NativeKernels.java      # JNI wrapper
-│       └── AlgoService.java        # Javalin HTTP service
+│       └── AlgoService.java        # Batch job application
 ├── docker/
 │   └── Dockerfile.cpu          # Multi-stage build
 ├── nginx/
@@ -216,11 +244,18 @@ chmod +x scripts/*.sh
 # Switch to Docker Desktop Kubernetes
 kubectl config use-context docker-desktop
 
-# Deploy to local Kubernetes
+# Create PVCs and deploy the job
 kubectl apply -f k8s/deployment.yaml
 
-# Port-forward for testing
-kubectl port-forward svc/algosvc 8081:80
+# Check job status
+kubectl get jobs
+kubectl get pods
+
+# View job logs
+kubectl logs job/algosvc-job
+
+# Clean up
+kubectl delete -f k8s/deployment.yaml
 ```
 
 ### Contributing
@@ -265,11 +300,16 @@ pwd  # Should show /home/username/work/algosvc, not /mnt/c/...
 docker run --rm algosvc:v0.1.0 ls -la /app/lib/
 ```
 
-**Port Already in Use**
+**No Input Files Found**
 ```bash
-# Kill existing containers or use different port
-docker ps
-docker kill <container_id>
-# OR
-docker run --rm -p 8081:8080 algosvc:v0.1.0
+# Ensure input directory exists and contains JSON files
+mkdir -p rundata/input
+echo '{"x": [1, 2, 3], "scale": 1.0}' > rundata/input/test.json
+```
+
+**Permission Denied on Output Directory**
+```bash
+# Ensure output directory is writable
+mkdir -p rundata/output
+chmod 777 rundata/output  # Or use appropriate permissions
 ```

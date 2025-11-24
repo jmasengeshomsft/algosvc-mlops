@@ -30,6 +30,8 @@ COPY --from=jar-build /build/target/algosvc-0.1.0.jar /app/app.jar
 COPY --from=native-build /src/build/libkernels.so /app/lib/
 ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75"
 ENV LD_LIBRARY_PATH=/app/lib
+ENV INPUT_DIR=/rundata/input
+ENV OUTPUT_DIR=/rundata/output
+ENV ALGO_VERSION=0.1.0
 USER 10001
-EXPOSE 8080
 ENTRYPOINT ["java","-jar","/app/app.jar"]
